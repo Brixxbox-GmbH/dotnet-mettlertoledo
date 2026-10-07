@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using RICADO.Sockets;
@@ -98,6 +99,7 @@ namespace RICADO.MettlerToledo.Channels
             int bytesReceived = 0;
             int packetsReceived = 0;
             DateTime startTimestamp = DateTime.UtcNow;
+            string requestCommand = getRequestCommand(protocol, requestMessage.ToArray());
 
 #if NETSTANDARD
             byte[] responseMessage = new byte[0];
@@ -119,6 +121,9 @@ namespace RICADO.MettlerToledo.Channels
                         await destroyAndInitializeClient(timeout, cancellationToken);
                     }
 
+                    // Discard any Stale or Unsolicited Data (e.g. Greeting Messages or Late Responses to Previous Requests)
+                    discardPendingData();
+
                     // Send the Message
                     SendMessageResult sendResult = await sendMessageAsync(requestMessage, protocol, timeout, cancellationToken);
 
@@ -126,7 +131,7 @@ namespace RICADO.MettlerToledo.Channels
                     packetsSent += sendResult.Packets;
 
                     // Receive a Response
-                    ReceiveMessageResult receiveResult = await receiveMessageAsync(protocol, timeout, cancellationToken);
+                    ReceiveMessageResult receiveResult = await receiveMessageAsync(protocol, requestCommand, timeout, cancellationToken);
 
                     bytesReceived += receiveResult.Bytes;
                     packetsReceived += receiveResult.Packets;
@@ -245,7 +250,7 @@ namespace RICADO.MettlerToledo.Channels
             return result;
         }
 
-        private async Task<ReceiveMessageResult> receiveMessageAsync(ProtocolType protocol, int timeout, CancellationToken cancellationToken)
+        private async Task<ReceiveMessageResult> receiveMessageAsync(ProtocolType protocol, string requestCommand, int timeout, CancellationToken cancellationToken)
         {
 #if NETSTANDARD
             ReceiveMessageResult result = new ReceiveMessageResult
@@ -302,6 +307,8 @@ namespace RICADO.MettlerToledo.Channels
                         }
                     }
 
+                    removeUnrelatedMessages(protocol, requestCommand, receivedData);
+
                     receiveCompleted = isReceiveCompleted(protocol, receivedData);
                 }
 
@@ -331,6 +338,81 @@ namespace RICADO.MettlerToledo.Channels
             }
 
             return result;
+        }
+
+        private void discardPendingData()
+        {
+            if (_client == null)
+            {
+                return;
+            }
+
+            byte[] buffer = new byte[256];
+
+            while (_client.Available > 0)
+            {
+                if (_client.Socket.Receive(buffer, Math.Min(buffer.Length, _client.Available), System.Net.Sockets.SocketFlags.None) <= 0)
+                {
+                    break;
+                }
+            }
+        }
+
+        private static string getRequestCommand(ProtocolType protocol, byte[] requestMessage)
+        {
+            if (protocol != ProtocolType.SICS)
+            {
+                return null;
+            }
+
+            string message = Encoding.ASCII.GetString(requestMessage).Trim();
+            int spaceIndex = message.IndexOf(' ');
+
+            return spaceIndex < 0 ? message : message.Substring(0, spaceIndex);
+        }
+
+        // Removes complete Messages that are not a Response to the Request (e.g. an "I4 A ..." Greeting sent by some Indicators after Connecting)
+        private static void removeUnrelatedMessages(ProtocolType protocol, string requestCommand, List<byte> receivedData)
+        {
+            if (protocol != ProtocolType.SICS || string.IsNullOrEmpty(requestCommand))
+            {
+                return;
+            }
+
+            int etxIndex;
+
+            while ((etxIndex = receivedData.IndexOf(SICS.Response.ETX)) >= 0)
+            {
+                string message = Encoding.ASCII.GetString(receivedData.Take(etxIndex).ToArray());
+
+                if (isResponseToRequest(requestCommand, message))
+                {
+                    return;
+                }
+
+                receivedData.RemoveRange(0, etxIndex + SICS.Response.ETX.Length);
+            }
+        }
+
+        private static bool isResponseToRequest(string requestCommand, string message)
+        {
+            int spaceIndex = message.IndexOf(' ');
+            string responseCommand = spaceIndex < 0 ? message : message.Substring(0, spaceIndex);
+
+            switch (responseCommand)
+            {
+                case "ES":
+                case "ET":
+                case "EL":
+                case "EI":
+                    return true;
+
+                case "S":
+                    return requestCommand == "S" || requestCommand == "SI";
+
+                default:
+                    return responseCommand == requestCommand;
+            }
         }
 
         private bool isReceiveCompleted(ProtocolType protocol, List<byte> receivedData)
