@@ -7,7 +7,8 @@ namespace RICADO.MettlerToledo.SICS
     {
         #region Constants
 
-        private const string SuccessMessageRegex = "^SIX1 ([SD]) 0 ([ZN]) [RN] R 0 0 0 1 [NMP] ([0-9\u0020\u002E\\-]{9}) ([0-9\u0020\u002E\\-]{9}) ([0-9\u0020\u002E\\-]{9}) (.*)$";
+        // MinW, Rep, Calc, PosE, StepE, MarkE, Range and TM vary between Indicators and Configurations, as does the Width of the Weight Fields (e.g. 9 or 10 Characters)
+        private const string SuccessMessageRegex = "^SIX1 ([SD]) \\S ([ZN]) \\S \\S \\S \\S \\S \\S \\S\u0020+([\u002B\\-]?[0-9\u002E]+)\u0020+([\u002B\\-]?[0-9\u002E]+)\u0020+([\u002B\\-]?[0-9\u002E]+) (.*)$";
         private const string OutOfRangeMessageRegex = "^SIX1 [\u002B\u002B\\-]";
         private const string FailureMessageRegex = "^SIX1 [/I]";
 
