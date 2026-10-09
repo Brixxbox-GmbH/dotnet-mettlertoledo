@@ -2,13 +2,14 @@
 
   <PropertyGroup>
     <TargetFrameworks>net10.0;net8.0;netstandard2.0</TargetFrameworks>
-    <Authors>RICADO</Authors>
+    <PackageId>brixxbox.MettlerToledo</PackageId>
+    <Authors>RICADO; Brixxbox GmbH</Authors>
     <Company>RICADO Limited</Company>
     <Description>A .NET 8+ and .NET Standard 2.0 Library for Communicating with Mettler Toledo Indicators</Description>
     <Copyright>Copyright © RICADO Limited 2009 - 2026</Copyright>
     <PackageLicenseFile>LICENSE</PackageLicenseFile>
     <PackageIcon>packageIcon.png</PackageIcon>
-    <RepositoryUrl>https://github.com/ricado-group/dotnet-mettlertoledo</RepositoryUrl>
+    <RepositoryUrl>https://github.com/Brixxbox-GmbH/dotnet-mettlertoledo</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>

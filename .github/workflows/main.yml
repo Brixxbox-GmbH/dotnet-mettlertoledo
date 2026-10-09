@@ -10,47 +10,40 @@ on:
       - '*.*.*'
   pull_request:
 
-permissions: {}
+permissions:
+  contents: read
+
+env:
+  PROJECT: RICADO.MettlerToledo/RICADO.MettlerToledo.csproj
+  BB_NUGET_URL: https://pkgs.dev.azure.com/brixxbox/_packaging/BB-NuGet/nuget/v3/index.json
+  # Tag (z.B. 2.0.1) = Paketversion, sonst Dummy-Version fuer CI-Builds
+  VERSION: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || '0.0.0-ci' }}
 
 # Workflow Jobs
 jobs:
   build:
-    if: ${{ !startsWith(github.ref, 'refs/tags/') }}
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
     steps:
       - name: Checkout Code
         uses: actions/checkout@v6
-      
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
       - name: Build
-        uses: ricado-group/dotnet-library-build-release-action@v2
-        with:
-          project-name: 'RICADO.MettlerToledo'
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          private-nuget-url: 'https://nuget.pkg.github.com/ricado-group/index.json'
-          private-nuget-token: ${{ secrets.GH_PACKAGES_PAT }}
-          public-nuget-user: ${{ vars.NUGET_USER }}
-          publish-public: false
-          dotnet-version: 10.0.x
-  
-  publish:
-    if: ${{ startsWith(github.ref, 'refs/tags/') }}
-    runs-on: ubuntu-latest
-    permissions:
-      id-token: write
-      contents: write
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v6
-      
-      - name: Build and Publish
-        uses: ricado-group/dotnet-library-build-release-action@v2
-        with:
-          project-name: 'RICADO.MettlerToledo'
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          private-nuget-url: 'https://nuget.pkg.github.com/ricado-group/index.json'
-          private-nuget-token: ${{ secrets.GH_PACKAGES_PAT }}
-          public-nuget-user: ${{ vars.NUGET_USER }}
-          publish-public: true
-          dotnet-version: 10.0.x
+        run: dotnet build "$PROJECT" -c Release -p:Version=$VERSION
+
+      - name: Pack
+        run: dotnet pack "$PROJECT" -c Release --no-build -o out -p:Version=$VERSION
+
+      - name: Publish to BB-NuGet
+        if: ${{ startsWith(github.ref, 'refs/tags/') }}
+        env:
+          BB_NUGET_PAT: ${{ secrets.BB_NUGET_PAT }}
+        run: |
+          dotnet nuget add source "$BB_NUGET_URL" --name BB-NuGet \
+            --username "github-actions" --password "$BB_NUGET_PAT" --store-password-in-clear-text
+          # Azure Artifacts nimmt keine .snupkg an -> Symbole werden nicht mitveroeffentlicht
+          dotnet nuget push "out/*.nupkg" --source BB-NuGet --api-key az --no-symbols
