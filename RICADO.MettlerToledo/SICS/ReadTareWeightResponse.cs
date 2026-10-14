@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Globalization;
 using System.Text.RegularExpressions;
 
 namespace RICADO.MettlerToledo.SICS
@@ -82,7 +83,7 @@ namespace RICADO.MettlerToledo.SICS
 
             double weight;
 
-            if(double.TryParse(regexSplit[1], out weight) == false)
+            if(double.TryParse(regexSplit[1], NumberStyles.Float, CultureInfo.InvariantCulture, out weight) == false)
             {
                 throw new SICSException("Failed to Extract a Weight Value from the Read Tare Weight Response");
             }

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Globalization;
 using System.Text.RegularExpressions;
 
 namespace RICADO.MettlerToledo.SICS
@@ -98,21 +99,21 @@ namespace RICADO.MettlerToledo.SICS
 
             _centerOfZero = regexSplit[2] == "Z";
 
-            if(double.TryParse(regexSplit[3], out double grossWeight) == false)
+            if(double.TryParse(regexSplit[3], NumberStyles.Float, CultureInfo.InvariantCulture, out double grossWeight) == false)
             {
                 throw new SICSException("Failed to Read the Weight and Status. The Gross Weight was Invalid");
             }
 
             _grossWeight = grossWeight;
 
-            if (double.TryParse(regexSplit[4], out double netWeight) == false)
+            if (double.TryParse(regexSplit[4], NumberStyles.Float, CultureInfo.InvariantCulture, out double netWeight) == false)
             {
                 throw new SICSException("Failed to Read the Weight and Status. The Net Weight was Invalid");
             }
 
             _netWeight = netWeight;
 
-            if (double.TryParse(regexSplit[5], out double tareWeight) == false)
+            if (double.TryParse(regexSplit[5], NumberStyles.Float, CultureInfo.InvariantCulture, out double tareWeight) == false)
             {
                 throw new SICSException("Failed to Read the Weight and Status. The Tare Weight was Invalid");
             }
