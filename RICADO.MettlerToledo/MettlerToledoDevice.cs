@@ -16,6 +16,7 @@ namespace RICADO.MettlerToledo
         private readonly int _port;
         private int _timeout;
         private int _retries;
+        private int _greetingTimeout;
 
         private bool _isInitialized = false;
         private readonly object _isInitializedLock = new object();
@@ -63,6 +64,27 @@ namespace RICADO.MettlerToledo
             set
             {
                 _retries = value;
+            }
+        }
+
+        /// <summary>
+        /// Milliseconds to wait for a Greeting Message (e.g. "I4 A ...") after Connecting before any Request is sent. 0 disables waiting.
+        /// Must be set before <see cref="InitializeAsync"/>.
+        /// </summary>
+        public int GreetingTimeout
+        {
+            get
+            {
+                return _greetingTimeout;
+            }
+            set
+            {
+                if (value < 0)
+                {
+                    throw new ArgumentOutOfRangeException(nameof(value), "The Greeting Timeout Value cannot be Negative");
+                }
+
+                _greetingTimeout = value;
             }
         }
 
@@ -144,7 +166,7 @@ namespace RICADO.MettlerToledo
             {
                 try
                 {
-                    _channel = new EthernetChannel(_remoteHost, _port);
+                    _channel = new EthernetChannel(_remoteHost, _port, _greetingTimeout);
 
                     await _channel.InitializeAsync(_timeout, cancellationToken);
                 }

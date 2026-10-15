@@ -14,6 +14,7 @@ namespace RICADO.MettlerToledo.Channels
 
         private readonly string _remoteHost;
         private readonly int _port;
+        private readonly int _greetingTimeout;
 
         private TcpClient _client;
 
@@ -33,10 +34,11 @@ namespace RICADO.MettlerToledo.Channels
 
         #region Constructors
 
-        internal EthernetChannel(string remoteHost, int port)
+        internal EthernetChannel(string remoteHost, int port, int greetingTimeout = 0)
         {
             _remoteHost = remoteHost;
             _port = port;
+            _greetingTimeout = greetingTimeout;
 
             _semaphore = new SemaphoreSlim(1, 1);
         }
@@ -171,11 +173,62 @@ namespace RICADO.MettlerToledo.Channels
 
         #region Private Methods
 
-        private Task initializeClient(int timeout, CancellationToken cancellationToken)
+        private async Task initializeClient(int timeout, CancellationToken cancellationToken)
         {
             _client = new TcpClient(RemoteHost, Port);
 
-            return _client.ConnectAsync(timeout, cancellationToken);
+            await _client.ConnectAsync(timeout, cancellationToken);
+
+            if (_greetingTimeout > 0)
+            {
+                await waitForGreetingAsync(cancellationToken);
+            }
+        }
+
+        // Some Indicators (e.g. BBA439) send an "I4 A ..." Greeting after Connecting and silently drop Commands received before the Greeting has been sent
+        private async Task waitForGreetingAsync(CancellationToken cancellationToken)
+        {
+            List<byte> receivedData = new List<byte>();
+            DateTime startTimestamp = DateTime.UtcNow;
+
+            while (receivedData.HasSequence(SICS.Response.ETX) == false)
+            {
+                TimeSpan receiveTimeout = TimeSpan.FromMilliseconds(_greetingTimeout).Subtract(DateTime.UtcNow.Subtract(startTimestamp));
+
+                if (receiveTimeout.TotalMilliseconds < 1)
+                {
+                    return;
+                }
+
+#if NETSTANDARD
+                byte[] buffer = new byte[100];
+#else
+                Memory<byte> buffer = new byte[100];
+#endif
+
+                int receivedBytes;
+
+                try
+                {
+                    receivedBytes = await _client.ReceiveAsync(buffer, receiveTimeout, cancellationToken);
+                }
+                catch (TimeoutException)
+                {
+                    // No Greeting received - the Indicator does not send one
+                    return;
+                }
+
+                if (receivedBytes <= 0)
+                {
+                    return;
+                }
+
+#if NETSTANDARD
+                receivedData.AddRange(buffer.Take(receivedBytes));
+#else
+                receivedData.AddRange(buffer.Slice(0, receivedBytes).ToArray());
+#endif
+            }
         }
 
         private void destroyClient()
