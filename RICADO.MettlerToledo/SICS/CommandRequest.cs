@@ -58,6 +58,9 @@ namespace RICADO.MettlerToledo.SICS
 
                 case CommandType.ClearTare:
                     return new CommandRequest(CommandType.ClearTare, Commands.ClearTareCommand);
+
+                case CommandType.Print:
+                    return new CommandRequest(CommandType.Print, Commands.PrintCommand);
             }
 
             throw new SICSException("Unknown Command Type '" + command.ToString() + "'");

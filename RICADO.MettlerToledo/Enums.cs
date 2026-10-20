@@ -9,6 +9,7 @@ namespace RICADO.MettlerToledo
         TareStable,
         TareImmediately,
         ClearTare,
+        Print,
     }
 
     public enum WeightType

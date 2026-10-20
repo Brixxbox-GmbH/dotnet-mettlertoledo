@@ -7,9 +7,9 @@ namespace RICADO.MettlerToledo.SICS
     {
         #region Constants
 
-        private const string SuccessMessageRegex = "^(Z|ZI|T|TI|TAC) [ADS]";
-        private const string OutOfRangeMessageRegex = "^(Z|ZI|T|TI|TAC) [\u002B\u002D\\-]";
-        private const string FailureMessageRegex = "^(Z|ZI|T|TI|TAC) [I]";
+        private const string SuccessMessageRegex = "^(Z|ZI|T|TI|TAC|PRN) [ADS]";
+        private const string OutOfRangeMessageRegex = "^(Z|ZI|T|TI|TAC|PRN) [\u002B\u002D\\-]";
+        private const string FailureMessageRegex = "^(Z|ZI|T|TI|TAC|PRN) [I]";
 
         #endregion
 
@@ -105,6 +105,13 @@ namespace RICADO.MettlerToledo.SICS
 
                     case CommandType.ClearTare:
                         if (regexSplit[1] != "TAC")
+                        {
+                            throwException = true;
+                        }
+                        break;
+
+                    case CommandType.Print:
+                        if (regexSplit[1] != "PRN")
                         {
                             throwException = true;
                         }

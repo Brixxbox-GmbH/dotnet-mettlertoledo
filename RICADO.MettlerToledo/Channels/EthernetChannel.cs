@@ -362,7 +362,7 @@ namespace RICADO.MettlerToledo.Channels
 
                     removeUnrelatedMessages(protocol, requestCommand, receivedData);
 
-                    receiveCompleted = isReceiveCompleted(protocol, receivedData);
+                    receiveCompleted = isReceiveCompleted(protocol, requestCommand, receivedData);
                 }
 
                 if (receivedData.Count == 0)
@@ -375,7 +375,7 @@ namespace RICADO.MettlerToledo.Channels
                     throw new MettlerToledoException("Failed to Receive " + protocol + " Message within the Timeout Period from Mettler Toledo Ethernet Device '" + RemoteHost + ":" + Port + "'");
                 }
 
-                result.Message = trimReceivedData(protocol, receivedData);
+                result.Message = trimReceivedData(protocol, requestCommand, receivedData);
             }
             catch (ObjectDisposedException)
             {
@@ -468,7 +468,7 @@ namespace RICADO.MettlerToledo.Channels
             }
         }
 
-        private bool isReceiveCompleted(ProtocolType protocol, List<byte> receivedData)
+        private bool isReceiveCompleted(ProtocolType protocol, string requestCommand, List<byte> receivedData)
         {
             if (receivedData.Count == 0)
             {
@@ -480,21 +480,16 @@ namespace RICADO.MettlerToledo.Channels
                 return false;
             }
 
-            if (receivedData.HasSequence(SICS.Response.ETX) == false)
-            {
-                return false;
-            }
-
-            return true;
+            return getResponseLength(requestCommand, receivedData) > 0;
         }
 
 #if NETSTANDARD
-        private byte[] trimReceivedData(ProtocolType protocol, List<byte> receivedData)
+        private byte[] trimReceivedData(ProtocolType protocol, string requestCommand, List<byte> receivedData)
 #else
-        private Memory<byte> trimReceivedData(ProtocolType protocol, List<byte> receivedData)
+        private Memory<byte> trimReceivedData(ProtocolType protocol, string requestCommand, List<byte> receivedData)
 #endif
         {
-            if (receivedData.Count == 0)
+            if (receivedData.Count == 0 || protocol != ProtocolType.SICS)
             {
 #if NETSTANDARD
                 return Array.Empty<byte>();
@@ -503,11 +498,60 @@ namespace RICADO.MettlerToledo.Channels
 #endif
             }
 
-            byte[] etxBytes = protocol == ProtocolType.SICS ? SICS.Response.ETX : new byte[0];
+            return receivedData.Take(getResponseLength(requestCommand, receivedData)).ToArray();
+        }
 
-            int etxIndex = receivedData.IndexOf(etxBytes);
+        // Returns the Length of the complete SICS Response (including the final ETX), or -1 if the Response is not complete yet
+        // Most Responses are a single Line - "AMR" Responses are "AMR A", the Record Line(s) and a closing "AMR B"
+        private static int getResponseLength(string requestCommand, List<byte> receivedData)
+        {
+            int lineStart = 0;
+            bool firstLine = true;
 
-            return receivedData.Take(etxIndex + etxBytes.Length).ToArray();
+            while (true)
+            {
+                int etxIndex = indexOfEtx(receivedData, lineStart);
+
+                if (etxIndex < 0)
+                {
+                    return -1;
+                }
+
+                int lineEnd = etxIndex + SICS.Response.ETX.Length;
+
+                if (requestCommand != SICS.Commands.ReadAlibiRecord)
+                {
+                    return lineEnd;
+                }
+
+                string line = Encoding.ASCII.GetString(receivedData.Skip(lineStart).Take(etxIndex - lineStart).ToArray());
+
+                // "AMR A" opens the Record Lines - any other first Line (e.g. "AMR I" or "ES") is the complete Response
+                bool isLastLine = firstLine
+                    ? line != "AMR A"
+                    : (line.StartsWith("AMR ", StringComparison.Ordinal) || line == "ES" || line == "ET" || line == "EL" || line == "EI");
+
+                if (isLastLine)
+                {
+                    return lineEnd;
+                }
+
+                firstLine = false;
+                lineStart = lineEnd;
+            }
+        }
+
+        private static int indexOfEtx(List<byte> receivedData, int startIndex)
+        {
+            for (int i = startIndex; i < receivedData.Count - 1; i++)
+            {
+                if (receivedData[i] == SICS.Response.ETX[0] && receivedData[i + 1] == SICS.Response.ETX[1])
+                {
+                    return i;
+                }
+            }
+
+            return -1;
         }
 
         #endregion

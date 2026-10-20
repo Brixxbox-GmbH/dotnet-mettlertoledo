@@ -14,6 +14,8 @@ namespace RICADO.MettlerToledo.SICS
         public static readonly string TareStableCommand = "T";
         public static readonly string TareImmediatelyCommand = "TI";
         public static readonly string ClearTareCommand = "TAC";
+        public static readonly string PrintCommand = "PRN";
+        public static readonly string ReadAlibiRecord = "AMR";
         public static readonly string ReadFirmwareRevision = "I3";
         public static readonly string ReadSerialNumber = "I4";
 

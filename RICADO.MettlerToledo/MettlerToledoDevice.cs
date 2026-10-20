@@ -319,6 +319,28 @@ namespace RICADO.MettlerToledo
             return new ReadWeightAndStatusResult(result, response.StableStatus, response.CenterOfZero, response.GrossWeight, response.NetWeight, response.TareWeight, response.Units);
         }
 
+        /// <summary>
+        /// Reads the latest Record from the Alibi Memory (AMR LAST). A new Record is written e.g. by <see cref="CommandType.Print"/>.
+        /// </summary>
+        public async Task<ReadAlibiRecordResult> ReadLastAlibiRecordAsync(CancellationToken cancellationToken)
+        {
+            lock (_isInitializedLock)
+            {
+                if (_isInitialized == false || _channel == null)
+                {
+                    throw new MettlerToledoException("This Mettler Toledo Device must be Initialized first before any Requests can be Processed");
+                }
+            }
+
+            SICS.ReadAlibiRecordRequest request = SICS.ReadAlibiRecordRequest.CreateNew(this);
+
+            ProcessMessageResult result = await _channel.ProcessMessageAsync(request.BuildMessage(), ProtocolType.SICS, _timeout, _retries, cancellationToken);
+
+            SICS.ReadAlibiRecordResponse response = request.UnpackResponseMessage(result.ResponseMessage);
+
+            return new ReadAlibiRecordResult(result, response.RecordId, response.Timestamp, response.GrossWeight, response.NetWeight, response.TareWeight, response.PresetTare, response.Units, response.Record);
+        }
+
         #endregion
 
 
